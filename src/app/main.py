@@ -4,11 +4,16 @@ import argparse
 from typing import List
 
 from src.lib.prompt_builder import build_prompt
+from src.lib.speech import speak, chime
+from src.lib.eyesfree import parse_command
 
 
-def runInteractive() -> None:
+def runInteractive(say: bool = False, voice: str | None = None, rate: int | None = None, do_chime: bool = True, guide: bool = False, eyesfree: bool = False, save_path: str | None = None) -> None:
     print("xxx CLI — simple prompt builder")
     print("Type lines; blank line to finish.\n")
+    if guide or eyesfree:
+        speak("Interactive mode. Type your text. Press return on an empty line to finish.", voice=voice, rate=rate, enabled=say)
+        chime(enabled=do_chime)
     lines: List[str] = []
     while True:
         try:
@@ -17,12 +22,67 @@ def runInteractive() -> None:
             print()
             break
         if not line.strip():
+            if eyesfree:
+                speak("Use slash commands. Say slash done to finish.", voice=voice, rate=rate, enabled=say)
+                continue
             break
+
+        is_cmd, cmd = parse_command(line)
+        if is_cmd and cmd:
+            if cmd.name == "undo":
+                if lines:
+                    lines.pop()
+                    speak("Undone.", voice=voice, rate=rate, enabled=say)
+                else:
+                    speak("Nothing to undo.", voice=voice, rate=rate, enabled=say)
+                if do_chime:
+                    chime(sound="Pop")
+                continue
+            if cmd.name == "read":
+                text = "\n".join(lines)
+                speak(text or "Nothing yet.", voice=voice, rate=rate, enabled=say)
+                if do_chime:
+                    chime()
+                continue
+            if cmd.name == "done":
+                break
+            if cmd.name == "help":
+                help_text = "Commands: /undo, /read, /done, /save <path>."
+                print(help_text)
+                speak(help_text, voice=voice, rate=rate, enabled=say)
+                continue
+            if cmd.name == "save":
+                path = cmd.arg
+                if not path:
+                    speak("Please provide a path.", voice=voice, rate=rate, enabled=say)
+                else:
+                    try:
+                        with open(path, "w", encoding="utf-8") as f:
+                            f.write("\n".join(lines))
+                        speak("Saved.", voice=voice, rate=rate, enabled=say)
+                    except Exception:
+                        speak("Save failed.", voice=voice, rate=rate, enabled=say)
+                if do_chime:
+                    chime(sound="Submarine")
+                continue
+
         lines.append(line)
+        if do_chime:
+            chime()
 
     prompt = build_prompt("chat", {"lines": lines})
     print("\n--- Prompt ---")
     print(prompt)
+    speak("Prompt ready.", voice=voice, rate=rate, enabled=say)
+    if say:
+        speak(prompt, voice=voice, rate=rate, enabled=True)
+    if save_path:
+        try:
+            with open(save_path, "w", encoding="utf-8") as f:
+                f.write(prompt)
+            speak("Saved.", voice=voice, rate=rate, enabled=say)
+        except Exception:
+            speak("Save failed.", voice=voice, rate=rate, enabled=say)
 
 
 def main() -> None:
@@ -35,16 +95,40 @@ def main() -> None:
         help="Prompt type to build",
     )
     parser.add_argument("text", nargs=argparse.REMAINDER, help="Optional free text to seed")
+    parser.add_argument("--speak", action="store_true", help="Read outputs aloud (macOS `say`)")
+    parser.add_argument("--voice", help="Voice name for TTS (macOS)")
+    parser.add_argument("--rate", type=int, help="Speech rate for TTS (words per minute)")
+    parser.add_argument("--no-chime", dest="chime", action="store_false", help="Disable audio cues")
+    parser.add_argument("--guide", action="store_true", help="Voice guidance in interactive mode")
+    parser.add_argument("--eyesfree", action="store_true", help="Eyes-free mode: use /done to finish and voice cues")
+    parser.add_argument("--save", help="Save the generated prompt to a file")
+    parser.set_defaults(chime=True)
     args = parser.parse_args()
 
     if not args.text and args.mode == "chat":
-        runInteractive()
+        runInteractive(
+            say=args.speak or args.eyesfree,
+            voice=args.voice,
+            rate=args.rate,
+            do_chime=args.chime or args.eyesfree,
+            guide=args.guide or args.eyesfree,
+            eyesfree=args.eyesfree,
+            save_path=args.save,
+        )
         return
 
     seed = " ".join(args.text).strip()
     payload = {"seed": seed} if seed else {}
     prompt = build_prompt(args.mode, payload)
     print(prompt)
+    if args.save:
+        try:
+            with open(args.save, "w", encoding="utf-8") as f:
+                f.write(prompt)
+            speak("Saved.", voice=args.voice, rate=args.rate, enabled=args.speak or args.eyesfree)
+        except Exception:
+            speak("Save failed.", voice=args.voice, rate=args.rate, enabled=args.speak or args.eyesfree)
+    speak(prompt, voice=args.voice, rate=args.rate, enabled=args.speak or args.eyesfree)
 
 
 if __name__ == "__main__":
