@@ -6,6 +6,7 @@ from typing import List
 from src.lib.prompt_builder import build_prompt
 from src.lib.speech import speak, chime
 from src.lib.eyesfree import parse_command
+from src.lib.stt import transcribe_once, has_speech_recognition
 
 
 def runInteractive(say: bool = False, voice: str | None = None, rate: int | None = None, do_chime: bool = True, guide: bool = False, eyesfree: bool = False, save_path: str | None = None) -> None:
@@ -102,10 +103,12 @@ def main() -> None:
     parser.add_argument("--guide", action="store_true", help="Voice guidance in interactive mode")
     parser.add_argument("--eyesfree", action="store_true", help="Eyes-free mode: use /done to finish and voice cues")
     parser.add_argument("--save", help="Save the generated prompt to a file")
+    parser.add_argument("--voicechat", action="store_true", help="Voice input per turn (mic → STT)")
+    parser.add_argument("--lang", default="ja-JP", help="STT language (e.g., ja-JP, en-US)")
     parser.set_defaults(chime=True)
     args = parser.parse_args()
 
-    if not args.text and args.mode == "chat":
+    if not args.text and args.mode == "chat" and not args.voicechat:
         runInteractive(
             say=args.speak or args.eyesfree,
             voice=args.voice,
@@ -115,6 +118,64 @@ def main() -> None:
             eyesfree=args.eyesfree,
             save_path=args.save,
         )
+        return
+
+    if args.voicechat and args.mode == "chat":
+        if not has_speech_recognition():
+            print("SpeechRecognition not installed. Install with: pip install SpeechRecognition pyaudio (or sounddevice)")
+            return
+        speak(
+            "Voice chat. Say your line after the chime. Say slash done to finish.",
+            voice=args.voice,
+            rate=args.rate,
+            enabled=args.speak or True,
+        )
+        lines: List[str] = []
+        while True:
+            chime()
+            text = transcribe_once(lang=args.lang)
+            if not text:
+                speak("No speech detected.", voice=args.voice, rate=args.rate, enabled=args.speak or True)
+                continue
+            is_cmd, cmd = parse_command(text)
+            if is_cmd and cmd:
+                if cmd.name == "undo":
+                    if lines:
+                        lines.pop()
+                        speak("Undone.", voice=args.voice, rate=args.rate, enabled=True)
+                    else:
+                        speak("Nothing to undo.", voice=args.voice, rate=args.rate, enabled=True)
+                    continue
+                if cmd.name == "read":
+                    speak("\n".join(lines) or "Nothing yet.", voice=args.voice, rate=args.rate, enabled=True)
+                    continue
+                if cmd.name == "done":
+                    break
+                if cmd.name == "save":
+                    path = (cmd.arg or args.save)
+                    if path:
+                        try:
+                            with open(path, "w", encoding="utf-8") as f:
+                                f.write("\n".join(lines))
+                            speak("Saved.", voice=args.voice, rate=args.rate, enabled=True)
+                        except Exception:
+                            speak("Save failed.", voice=args.voice, rate=args.rate, enabled=True)
+                    else:
+                        speak("Provide a path.", voice=args.voice, rate=args.rate, enabled=True)
+                    continue
+            lines.append(text)
+            speak(text, voice=args.voice, rate=args.rate, enabled=args.speak or True)
+
+        prompt = build_prompt("chat", {"lines": lines})
+        print(prompt)
+        if args.save:
+            try:
+                with open(args.save, "w", encoding="utf-8") as f:
+                    f.write(prompt)
+                speak("Saved.", voice=args.voice, rate=args.rate, enabled=True)
+            except Exception:
+                speak("Save failed.", voice=args.voice, rate=args.rate, enabled=True)
+        speak(prompt, voice=args.voice, rate=args.rate, enabled=args.speak or True)
         return
 
     seed = " ".join(args.text).strip()

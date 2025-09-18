@@ -13,7 +13,8 @@ A starter Python project scaffolded for CLI + simple HTML examples, following th
 - src/app: CLI entry (main.py)
 - src/lib: Core logic (prompt_builder.py)
 - src/lib/speech.py: Minimal TTS/chime utilities for accessibility
- - src/lib/eyesfree.py: Slash-command parser for eyes-free mode
+- src/lib/eyesfree.py: Slash-command parser for eyes-free mode
+ - src/lib/stt.py: Optional microphone STT (SpeechRecognition)
 - examples/: Single-file HTML apps
 - picture_diary/: Fixed local URLs (v1 and v2)
 - scripts/: Helper scripts
@@ -28,3 +29,13 @@ A starter Python project scaffolded for CLI + simple HTML examples, following th
 - Choose voice/rate: `--voice Alex --rate 190`
 - Audio cues: enabled by default; disable with `--no-chime`
 - Save output: `--save out.txt` (also available via `/save out.txt` in interactive)
+
+## Voice Chat (speech input)
+- Interactive voice input: `make run -- --voicechat --speak --lang ja-JP`
+  - Each turn listens after a chime, transcribes, then reads back
+  - Slash commands by voice: “スラッシュ アンドゥ”, “スラッシュ ドーン(/done)”, etc.
+- Dependencies (optional):
+  - `pip install SpeechRecognition pyaudio` (or `sounddevice` on macOS)
+  - If not installed, CLI will fall back to text only
+- Testing without mic:
+  - `STT_DRY_RUN=1 STT_DRY_RUN_TEXT="こんにちは" make run -- --voicechat`
