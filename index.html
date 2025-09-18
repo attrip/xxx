@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>xxx – One‑Key Commit</title>
+    <style>
+      body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; margin: 20px; }
+      .card { border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-bottom:16px; }
+      .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+      input, button { font-size: 14px; }
+      input[type=text], input[type=password] { width: 520px; padding:8px; }
+      .muted { color:#6b7280; font-size:12px; }
+      .ok { color:#10b981; }
+      .err { color:#ef4444; }
+      .hint { color:#64748b; font-size:12px; }
+      .btn { padding:10px 14px; }
+    </style>
+  </head>
+  <body>
+    <h1>One‑Key Commit + Push</h1>
+    <p class="muted">このページ（index.html）から、Enter一発で <code>origin/main</code> へ反映できます。</p>
+
+    <section class="card">
+      <h3 style="margin:4px 0;">ローカルリポジトリ → origin/main（ローカルAPI使用）</h3>
+      <div style="margin-bottom:6px;" class="hint">推奨（<code>cd /Users/flex-pc0705/xxx && make web</code> でAPI起動）。</div>
+      <div class="row">
+        <input id="repoLocal" type="text" placeholder="/Users/your/repo" value="/Users/flex-pc0705/xxx" />
+        <input id="msgLocal" type="text" placeholder="commit message" value="chore: update index" />
+        <button id="goLocal" class="btn">Commit + Push（Enter）</button>
+      </div>
+      <div id="outLocal" class="muted" style="margin-top:6px;"></div>
+    </section>
+
+    <section class="card">
+      <h3 style="margin:4px 0;">GitHub API 直Push（ローカルAPI不要）</h3>
+      <div style="margin-bottom:6px;" class="hint">PATは保存しません。<code>repo</code> 権限が必要。</div>
+      <div class="row">
+        <input id="owner" type="text" placeholder="owner" value="attrip" />
+        <input id="repo" type="text" placeholder="repo" value="xxx" />
+        <input id="branch" type="text" placeholder="branch" value="main" />
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <input id="path" type="text" placeholder="path in repo" value="index.html" />
+        <input id="msgRemote" type="text" placeholder="commit message" value="chore: update index (remote)" />
+      </div>
+      <div class="row" style="margin-top:6px;">
+        <input id="token" type="password" placeholder="GitHub Token (repo scope)" />
+        <button id="goRemote" class="btn">Commit + Push（Enterでも可）</button>
+      </div>
+      <div id="outRemote" class="muted" style="margin-top:6px;"></div>
+    </section>
+
+    <section class="card">
+      <h3 style="margin:4px 0;">ヘルプ</h3>
+      <ul class="muted">
+        <li>ローカルAPI: make web を実行し、localhost:8000 を起動してから使うとEnter一発で反映。</li>
+        <li>APIなし運用: 下のGitHub欄にトークンとリポジトリ/パスを入れて使う。</li>
+      </ul>
+    </section>
+
+    <script>
+      const $ = (s) => document.querySelector(s);
+      function pageFileUrl() { return window.location.href; }
+      async function postLocal(path, body) {
+        const r = await fetch(`http://localhost:8000${path}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) });
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        return await r.json();
+      }
+      function b64encode(str) { return btoa(unescape(encodeURIComponent(str))); }
+      function headers(token) { return { 'Accept': 'application/vnd.github+json', 'Authorization': `Bearer ${token}` }; }
+      async function getSHA(owner, repo, path, branch, token) {
+        const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+        const r = await fetch(url, { headers: headers(token) });
+        if (r.status === 404) return null; if (!r.ok) throw new Error(`GET ${r.status}`); const j = await r.json(); return j.sha || null;
+      }
+      async function putFile(owner, repo, path, branch, message, content, token, sha) {
+        const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
+        const body = { message, content: b64encode(content), branch, ...(sha?{sha}: {}) };
+        const r = await fetch(url, { method: 'PUT', headers: { ...headers(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!r.ok) { const t = await r.text(); throw new Error(`PUT ${r.status}: ${t}`); }
+        return await r.json();
+      }
+
+      async function goLocal() {
+        const repo = $('#repoLocal').value.trim(); const msg = $('#msgLocal').value.trim() || 'chore: update index';
+        if (!repo) { $('#outLocal').textContent = 'repo path が空です'; return; }
+        $('#outLocal').textContent = 'staging...';
+        await postLocal('/api/git/add', { repo, paths: [pageFileUrl()] });
+        $('#outLocal').textContent = 'committing...';
+        await postLocal('/api/git/commit', { repo, message: msg });
+        $('#outLocal').textContent = 'pushing...';
+        const res = await postLocal('/api/git/push', { repo, remote: 'origin', branch: 'main' });
+        $('#outLocal').textContent = 'done'; $('#outLocal').className = 'ok';
+      }
+
+      async function goRemote() {
+        const owner = $('#owner').value.trim(); const repo = $('#repo').value.trim(); const path = $('#path').value.trim();
+        const branch = ($('#branch').value.trim() || 'main'); const msg = $('#msgRemote').value.trim() || 'chore: update index (remote)'; const token = $('#token').value.trim();
+        if (!owner || !repo || !path || !token) { $('#outRemote').textContent = '入力を確認してください'; return; }
+        const html = document.documentElement.outerHTML; // 現在のページ内容を送る
+        $('#outRemote').textContent = 'checking…';
+        const sha = await getSHA(owner, repo, path, branch, token);
+        $('#outRemote').textContent = 'pushing…';
+        const res = await putFile(owner, repo, path, branch, msg, html, token, sha);
+        const link = res && res.content && res.content.html_url ? res.content.html_url : '';
+        $('#outRemote').innerHTML = `done ${link ? '· <a target="_blank" href="' + link + '">view</a>' : ''}`; $('#outRemote').className = 'ok';
+      }
+
+      $('#goLocal').addEventListener('click', goLocal);
+      $('#goRemote').addEventListener('click', goRemote);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          // まずローカルAPIに挑戦、失敗したらリモート欄を使う
+          goLocal().catch(() => { $('#outLocal').textContent = 'local API unavailable'; goRemote(); });
+        }
+      });
+    </script>
+  </body>
+  </html>
