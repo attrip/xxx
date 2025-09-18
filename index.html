@@ -15,6 +15,30 @@
         0% { transform: translateX(110vw); }
         100% { transform: translateX(-120px); }
       }
+      /* Tail wag animation */
+      .tail { transform-box: fill-box; transform-origin: 20% 50%; animation: wag 1.2s ease-in-out infinite; }
+      @keyframes wag { 0% { rotate: 8deg; } 50% { rotate: -10deg; } 100% { rotate: 8deg; } }
+
+      /* Rainbow arc */
+      .rainbow {
+        position:absolute; inset:auto -10vmin -50vmin -10vmin; width:140vmin; height:140vmin;
+        margin:auto; border-radius:50%; opacity:.6; pointer-events:none; z-index:0;
+        background: conic-gradient(from 180deg,
+          #ff0040, #ff7a00, #ffef00, #2bd52b, #00c0ff, #3a3aff, #a93aff, #ff0040);
+        -webkit-mask: radial-gradient(circle at 50% 50%, transparent 58%, black 59%, black 63%, transparent 64%);
+                mask: radial-gradient(circle at 50% 50%, transparent 58%, black 59%, black 63%, transparent 64%);
+        filter: blur(0.6px);
+        animation: drift 12s linear infinite;
+      }
+      @keyframes drift { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+      /* Subtle stars */
+      .stars { position:absolute; inset:0; background:
+        radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,.7) 50%, transparent 60%),
+        radial-gradient(1.5px 1.5px at 70% 20%, rgba(255,255,255,.5) 50%, transparent 60%),
+        radial-gradient(1.8px 1.8px at 40% 70%, rgba(255,255,255,.6) 50%, transparent 60%),
+        radial-gradient(1.2px 1.2px at 85% 55%, rgba(255,255,255,.5) 50%, transparent 60%);
+        opacity:.25; pointer-events:none; z-index:0; }
       .controls { position:absolute; right:12px; bottom:12px; display:flex; gap:8px; z-index:10; }
       .btn { background:#0ea5e9; color:white; border:none; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:14px; }
       .btn.secondary { background:#374151; }
@@ -22,7 +46,10 @@
   </head>
   <body>
     <header>Cat Parade — ねこが横に流れていくよ 🐾</header>
-    <div class="world" id="world"></div>
+    <div class="world" id="world">
+      <div class="rainbow"></div>
+      <div class="stars"></div>
+    </div>
     <div class="controls">
       <button class="btn" id="add">猫をふやす</button>
       <button class="btn secondary" id="clear">全部けす</button>
@@ -45,25 +72,44 @@
               <stop offset="100%" stop-color="#ffdfe6" />
             </linearGradient>
           </defs>
-          <!-- body -->
-          <ellipse cx="55" cy="65" rx="25" ry="22" fill="url(#g1)" />
-          <!-- tail -->
-          <path d="M72 65c14 2 16 10 10 16-5 5-13 2-16-2" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" />
-          <!-- head -->
-          <circle cx="40" cy="45" r="18" fill="url(#g1)" />
-          <!-- ears -->
-          <path d="M28 39l6-10 6 10z" fill="${color}" />
-          <path d="M40 36l6-10 6 10z" fill="${color}" />
-          <!-- eyes -->
-          <circle cx="34" cy="45" r="2.4" fill="#222" />
-          <circle cx="46" cy="45" r="2.4" fill="#222" />
-          <!-- nose -->
-          <circle cx="40" cy="50" r="1.6" fill="#e57373" />
+          <!-- body softer oval -->
+          <ellipse cx="58" cy="66" rx="26" ry="22" fill="url(#g1)" />
+          <!-- tail (wagging) -->
+          <g class="tail">
+            <path d="M72 66c14 2 16 10 10 16-5 5-13 2-16-2" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" />
+          </g>
+          <!-- head larger & rounder -->
+          <circle cx="42" cy="46" r="19" fill="url(#g1)" />
+          <!-- inner ears -->
+          <path d="M29 40l6-10 6 10z" fill="#ffc0cb" opacity=".8" />
+          <path d="M41 37l6-10 6 10z" fill="#ffc0cb" opacity=".8" />
+          <!-- ears outline -->
+          <path d="M28 39l6-10 6 10z" fill="${color}" opacity=".9" />
+          <path d="M40 36l6-10 6 10z" fill="${color}" opacity=".9" />
+          <!-- eyes with gentle blink -->
+          <ellipse cx="35" cy="46" rx="2.6" ry="2.2" fill="#222">
+            <animate attributeName="ry" values="2.2;0.3;2.2" dur="4s" repeatCount="indefinite" />
+          </ellipse>
+          <ellipse cx="49" cy="46" rx="2.6" ry="2.2" fill="#222">
+            <animate attributeName="ry" values="2.2;2.2;0.3;2.2" dur="5s" repeatCount="indefinite" />
+          </ellipse>
+          <!-- nose & mouth -->
+          <circle cx="42" cy="51" r="1.8" fill="#e57373" />
+          <path d="M38 54q4 4 8 0" stroke="#333" stroke-width="1.4" fill="none" stroke-linecap="round" />
+          <!-- blush -->
+          <circle cx="32" cy="52" r="3.5" fill="#ffb6c1" opacity=".6" />
+          <circle cx="52" cy="52" r="3.5" fill="#ffb6c1" opacity=".6" />
           <!-- whiskers -->
-          <path d="M28 50h10M32 53h8M52 50h-10M48 53h-8" stroke="#555" stroke-width="1.6" stroke-linecap="round" />
-          <!-- feet -->
-          <circle cx="48" cy="82" r="3" fill="#fff" opacity=".9" />
-          <circle cx="62" cy="82" r="3" fill="#fff" opacity=".9" />
+          <path d="M26 51h11M30 54h9M58 51h-11M54 54h-9" stroke="#555" stroke-width="1.6" stroke-linecap="round" />
+          <!-- paws with toe beans -->
+          <g opacity=".95">
+            <circle cx="50" cy="82" r="4" fill="#fff" />
+            <circle cx="64" cy="82" r="4" fill="#fff" />
+            <circle cx="49" cy="81" r="1.2" fill="#ffb6c1" />
+            <circle cx="51" cy="83" r="1" fill="#ffb6c1" />
+            <circle cx="63" cy="81" r="1.2" fill="#ffb6c1" />
+            <circle cx="65" cy="83" r="1" fill="#ffb6c1" />
+          </g>
         `;
         return svg;
       }
