@@ -29,12 +29,26 @@
     </section>
 
     <section class="card">
+      <h3>HTML 作業ファイル</h3>
+      <div class="row" style="margin-top:6px;">
+        <input id="htmlPath" type="text" placeholder="/Users/you/work/page.html または file:///.../page.html" style="width:520px" />
+        <input id="htmlTitle" type="text" placeholder="Page title" style="width:220px" />
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button id="ensureHtml">Create/Open</button>
+        <button id="stageHtml">git add to repo</button>
+        <span id="htmlOut" class="muted"></span>
+      </div>
+    </section>
+
+    <section class="card">
       <div class="row">
         <input id="paths" type="text" placeholder="スペース区切りで複数パス /Users/you/a /Users/you/b" />
         <button id="add">git add</button>
       </div>
       <div class="row" style="margin-top:8px;">
-        <input id="msg" type="text" placeholder="commit message (省略時: chore: update)" style="width: 420px;" />
+        <input id="repo" type="text" placeholder="repo path (省略時はこのリポジトリ)" style="width: 300px;" />
+        <input id="msg" type="text" placeholder="commit message (省略時: chore: update)" style="width: 300px;" />
         <button id="commit">commit</button>
         <button id="push">push origin main</button>
       </div>
@@ -48,9 +62,10 @@
         if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
         return await r.json();
       }
+      function repoArg() { const v = $('#repo').value.trim(); return v ? {repo:v} : {}; }
       async function refresh() {
         try {
-          const s = await post('/api/git/status');
+          const s = await post('/api/git/status', repoArg());
           $('#status').textContent = `cwd: ${s.cwd}\nbranch: ${s.branch}\n\n${s.status || ''}\n${s.remote || ''}`;
         } catch (e) {
           $('#status').textContent = `err: ${e.message}`;
@@ -58,7 +73,7 @@
       }
       async function handle() {
         const url = $('#url').value.trim(); if (!url) return;
-        const res = await post('/api/handle_url', {url});
+        const res = await post('/api/handle_url', {url, ...repoArg()});
         if (res.action === 'staged') {
           $('#handleOut').textContent = `staged: ${res.path}`; $('#handleOut').className = 'ok';
         } else if (res.action === 'external') {
@@ -71,24 +86,41 @@
       async function add() {
         const v = $('#paths').value.trim(); if (!v) return;
         const parts = v.split(/\s+/);
-        const res = await post('/api/git/add', {paths: parts});
+        const res = await post('/api/git/add', {paths: parts, ...repoArg()});
         $('#handleOut').textContent = `added: ${(res.added||[]).join(', ')}`; $('#handleOut').className = 'ok';
         await refresh();
       }
       async function commit() {
         const msg = $('#msg').value.trim();
-        const res = await post('/api/git/commit', {message: msg});
+        const res = await post('/api/git/commit', {message: msg, ...repoArg()});
         $('#handleOut').textContent = (res.output||'').trim(); $('#handleOut').className = 'muted';
         await refresh();
       }
       async function push() {
-        const res = await post('/api/git/push', {remote:'origin', branch:'main'});
+        const res = await post('/api/git/push', {remote:'origin', branch:'main', ...repoArg()});
         $('#handleOut').textContent = (res.output||'').trim(); $('#handleOut').className = 'muted';
+        await refresh();
+      }
+
+      // HTML helpers
+      async function ensureHtml() {
+        const path = $('#htmlPath').value.trim(); if (!path) return;
+        const title = $('#htmlTitle').value.trim() || 'My Page';
+        const res = await post('/api/file/ensure_html', {path, title, open:true});
+        $('#htmlOut').textContent = `${res.created ? 'created' : 'exists'}: ${res.file_url}`;
+        $('#htmlOut').className = res.created ? 'ok' : 'muted';
+      }
+      async function stageHtml() {
+        const path = $('#htmlPath').value.trim(); if (!path) return;
+        const res = await post('/api/git/add', {paths:[path], ...repoArg()});
+        $('#htmlOut').textContent = `staged: ${(res.added||[]).join(', ')}`; $('#htmlOut').className = 'ok';
         await refresh();
       }
 
       window.addEventListener('load', () => {
         $('#handle').addEventListener('click', handle);
+        $('#ensureHtml').addEventListener('click', ensureHtml);
+        $('#stageHtml').addEventListener('click', stageHtml);
         $('#add').addEventListener('click', add);
         $('#commit').addEventListener('click', commit);
         $('#push').addEventListener('click', push);
