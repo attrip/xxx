@@ -57,3 +57,6 @@ web-dev-agent:
 
 web-workbench:
 	OPEN_PATH=/workbench/index.html $(PYTHON) scripts/serve_web.py
+
+open-dev-remote:
+	@([ "$(shell uname)" = "Darwin" ] && open examples/dev_agent_remote.html) || (which xdg-open >/dev/null 2>&1 && xdg-open examples/dev_agent_remote.html) || echo "Open: examples/dev_agent_remote.html"
