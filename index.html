@@ -19,18 +19,18 @@
       .tail { transform-box: fill-box; transform-origin: 20% 50%; animation: wag 1.2s ease-in-out infinite; }
       @keyframes wag { 0% { rotate: 8deg; } 50% { rotate: -10deg; } 100% { rotate: 8deg; } }
 
-      /* Rainbow arc */
-      .rainbow {
-        position:absolute; inset:auto -10vmin -50vmin -10vmin; width:140vmin; height:140vmin;
-        margin:auto; border-radius:50%; opacity:.6; pointer-events:none; z-index:0;
-        background: conic-gradient(from 180deg,
-          #ff0040, #ff7a00, #ffef00, #2bd52b, #00c0ff, #3a3aff, #a93aff, #ff0040);
-        -webkit-mask: radial-gradient(circle at 50% 50%, transparent 58%, black 59%, black 63%, transparent 64%);
-                mask: radial-gradient(circle at 50% 50%, transparent 58%, black 59%, black 63%, transparent 64%);
-        filter: blur(0.6px);
-        animation: drift 12s linear infinite;
+      /* Rainbow trail behind each cat (to the right side) */
+      .trail {
+        position:absolute; left: 86px; top: 50%; transform: translateY(-50%);
+        height: 12px; width: 35vmin; opacity: .78; border-radius: 8px;
+        background: linear-gradient(90deg,#ff0040,#ff7a00,#ffef00,#2bd52b,#00c0ff,#3a3aff,#a93aff);
+        background-size: 200% 100%;
+        animation: flow 2s linear infinite;
+        filter: saturate(1.15) blur(.2px);
+        -webkit-mask: linear-gradient(90deg, transparent 0%, black 10%, black 95%, transparent 100%);
+                mask: linear-gradient(90deg, transparent 0%, black 10%, black 95%, transparent 100%);
       }
-      @keyframes drift { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes flow { from { background-position: 0% 0; } to { background-position: 200% 0; } }
 
       /* Subtle stars */
       .stars { position:absolute; inset:0; background:
@@ -47,7 +47,6 @@
   <body>
     <header>Cat Parade — ねこが横に流れていくよ 🐾</header>
     <div class="world" id="world">
-      <div class="rainbow"></div>
       <div class="stars"></div>
     </div>
     <div class="controls">
@@ -128,6 +127,11 @@
         const dur = random(8, 16).toFixed(2);
         const delay = -random(0, 12).toFixed(2); // negative to start mid-way
         wrap.style.animation = `scrollLeft ${dur}s linear ${delay}s infinite`;
+        // rainbow trail appears after the cat (to the right)
+        const trail = document.createElement('div');
+        trail.className = 'trail';
+        wrap.appendChild(trail);
+        // cute cat SVG on top
         wrap.appendChild(makeCatSVG(pastel()));
         world.appendChild(wrap);
         return wrap;
