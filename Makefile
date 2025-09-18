@@ -49,4 +49,8 @@ open-partner:
 	@([ "$(shell uname)" = "Darwin" ] && open examples/partner_voice_site.html) || (which xdg-open >/dev/null 2>&1 && xdg-open examples/partner_voice_site.html) || echo "Open: examples/partner_voice_site.html"
 
 open-dev-agent:
+	@echo "Tip: API needs localhost. Prefer: make web-dev-agent"
 	@([ "$(shell uname)" = "Darwin" ] && open examples/dev_agent.html) || (which xdg-open >/dev/null 2>&1 && xdg-open examples/dev_agent.html) || echo "Open: examples/dev_agent.html"
+
+web-dev-agent:
+	OPEN_PATH=/examples/dev_agent.html $(PYTHON) scripts/serve_web.py

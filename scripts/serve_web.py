@@ -9,6 +9,7 @@ import subprocess
 import threading
 import urllib.parse
 import webbrowser
+import sys
 
 
 def open_browser(url: str) -> None:
@@ -197,4 +198,11 @@ def serve(port: int = 8000, open_path: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    serve()
+    index = os.environ.get("OPEN_PATH")
+    if not index and "--index" in sys.argv:
+        try:
+            idx = sys.argv.index("--index")
+            index = sys.argv[idx + 1]
+        except Exception:
+            index = None
+    serve(open_path=index)
