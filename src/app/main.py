@@ -7,6 +7,7 @@ from src.lib.prompt_builder import build_prompt
 from src.lib.speech import speak, chime
 from src.lib.eyesfree import parse_command
 from src.lib.stt import transcribe_once, has_speech_recognition
+from src.lib.session import run_session, SessionConfig
 
 
 def runInteractive(say: bool = False, voice: str | None = None, rate: int | None = None, do_chime: bool = True, guide: bool = False, eyesfree: bool = False, save_path: str | None = None) -> None:
@@ -105,8 +106,34 @@ def main() -> None:
     parser.add_argument("--save", help="Save the generated prompt to a file")
     parser.add_argument("--voicechat", action="store_true", help="Voice input per turn (mic → STT)")
     parser.add_argument("--lang", default="ja-JP", help="STT language (e.g., ja-JP, en-US)")
+    parser.add_argument("--session-mins", type=int, help="Run a timed session for N minutes (e.g., 15)")
+    parser.add_argument("--interval-sec", type=int, default=60, help="Prompt interval seconds during session")
     parser.set_defaults(chime=True)
     args = parser.parse_args()
+
+    # Timed session mode takes precedence for chat
+    if args.session_mins and args.mode == "chat":
+        cfg = SessionConfig(
+            minutes=args.session_mins,
+            interval_sec=args.interval_sec,
+            lang=args.lang,
+            use_voice=(args.speak or True),
+            voice_name=args.voice,
+            rate=args.rate,
+            use_voice_input=args.voicechat,
+            save_path=args.save,
+        )
+        lines = run_session(cfg)
+        prompt = build_prompt("chat", {"lines": lines})
+        print(prompt)
+        if args.save:
+            try:
+                with open(args.save, "w", encoding="utf-8") as f:
+                    f.write(prompt)
+                speak("保存しました。", voice=args.voice, rate=args.rate, enabled=True)
+            except Exception:
+                speak("保存に失敗しました。", voice=args.voice, rate=args.rate, enabled=True)
+        return
 
     if not args.text and args.mode == "chat" and not args.voicechat:
         runInteractive(

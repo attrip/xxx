@@ -39,3 +39,9 @@ A starter Python project scaffolded for CLI + simple HTML examples, following th
   - If not installed, CLI will fall back to text only
 - Testing without mic:
   - `STT_DRY_RUN=1 STT_DRY_RUN_TEXT="こんにちは" make run -- --voicechat`
+
+## Timed Session (focus 15min)
+- Guided session with gentle prompts: `make run -- --session-mins 15 --speak --voicechat --lang ja-JP`
+  - Interval prompts every `--interval-sec` (default 60)
+  - Respond by speaking or typing; supports `/pause`, `/resume`, `/skip`, `/read`, `/undo`, `/save <path>`, `/done`
+  - Transcript is timestamped; add `--save session.txt` to persist
