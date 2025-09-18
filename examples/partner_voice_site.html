@@ -66,15 +66,36 @@
           <button id="saveBtn" class="secondary">Save</button>
           <button id="clearBtn" class="danger">Clear</button>
         </div>
-        <div class="row" style="margin-top:6px;">
+        <div class="row" style="margin-top:6px; align-items:center; gap:12px;">
           <span class="hint">Commands: /pause /resume /skip /read /undo /save /done（日本語もOK: 終了, ポーズ, 再開, 読み上げ, 取り消し, 保存）</span>
+          <label style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+            <input type="checkbox" id="engage" checked> Partner responses
+          </label>
+          <label style="display:flex; gap:6px; align-items:center;">
+            Tone
+            <select id="tone">
+              <option value="gentle">Gentle</option>
+              <option value="probe">Probe</option>
+              <option value="energy">Energy</option>
+            </select>
+          </label>
         </div>
       </section>
 
       <section class="card">
-        <label for="typed">Type here (Enter to add)</label>
-        <input id="typed" class="mono" placeholder="あなたの言葉を入力…" />
-        <div class="hint" style="margin-top:6px;">Space: toggle mic, Enter: add text, Esc: stop session</div>
+        <div class="row">
+          <div style="flex:1 1 100%">
+            <label for="typed">Type here (Ctrl/Cmd+Enter to add, Enter×2 also OK)</label>
+            <textarea id="typed" class="mono" placeholder="あなたの言葉を流し込んでください…" style="height: 220px; font-size: 15px;"></textarea>
+            <div class="hint" style="margin-top:6px;">Space: toggle mic · Ctrl/Cmd+Enter: add · Enter×2: add · Esc: stop session · フォーカスは保持されます</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px; align-items: center;">
+          <label>Auto-chunk (sec, 0=off)</label>
+          <input id="autochunk" type="number" min="0" step="1" value="0" />
+          <label class="hint">タイピングが止まってから自動追加</label>
+          <label style="margin-left:auto; display:flex; gap:8px; align-items:center;"><input type="checkbox" id="bigInput"> Big Input</label>
+        </div>
       </section>
 
       <section class="card">
@@ -229,25 +250,65 @@
         }
       }
 
+      function partnerResponse(text) {
+        const t = $('#tone').value || 'gentle';
+        if (t === 'probe') {
+          const probes = ['もう少し詳しく。','いまの核心は？','一言で言うと？'];
+          return probes[Math.floor(Math.random()*probes.length)];
+        }
+        if (t === 'energy') {
+          const energ = ['いいね、続けよう。','その勢いで。','次の一歩は？'];
+          return energ[Math.floor(Math.random()*energ.length)];
+        }
+        const gentle = ['受け取りました。','そのまま、どうぞ。','うん。'];
+        return gentle[Math.floor(Math.random()*gentle.length)];
+      }
+
       function handleInput(text, viaVoice=false) {
         if (!text) return;
         const cmd = normalizeCommand(text);
         if (cmd) { handleCommand(cmd); return; }
         appendLine(text);
         const mode = $('#readback').value;
-        if (mode === 'confirm') speak('受け取りました。');
-        else if (mode === 'full') speak(text);
-        // chime after voice input
+        if ($('#engage').checked) {
+          const reply = partnerResponse(text);
+          if (mode === 'confirm') speak(reply);
+          else if (mode === 'full') speak(text + '。' + reply);
+        } else {
+          if (mode === 'confirm') speak('受け取りました。');
+          else if (mode === 'full') speak(text);
+        }
         if (viaVoice) chime();
+      }
+
+      const PROMPTS = {
+        gentle: [
+          'そのまま、いま気づいていることをどうぞ。',
+          'ゆっくりで大丈夫。言葉にできる範囲で。',
+          '呼吸に戻りつつ、続けて。',
+        ],
+        probe: [
+          'いま一番強い感情は？',
+          'それはなぜ大事？',
+          '一言で要するなら？',
+        ],
+        energy: [
+          'いい流れ。次の一手は？',
+          '勢いを保って、短く一文で。',
+          'もう一段、踏み込んでみよう。',
+        ],
+      };
+
+      function nextPromptText() {
+        const t = $('#tone').value || 'gentle';
+        const arr = PROMPTS[t] || PROMPTS.gentle;
+        return arr[Math.floor(Math.random()*arr.length)];
       }
 
       function startSessionTimer() {
         stopSessionTimer();
         const seconds = parseInt($('#interval').value || '60', 10);
-        const speakPrompt = () => {
-          chime();
-          speak('そのまま、気づいたことをどうぞ。終了する場合は、終了と言ってください。');
-        };
+        const speakPrompt = () => { chime(); speak(nextPromptText()); };
         // schedule
         state.sessionTimer = setInterval(speakPrompt, Math.max(10, seconds) * 1000);
       }
@@ -269,6 +330,28 @@
         stopSessionTimer(); $('#startSession').disabled = false; $('#stopSession').disabled = true;
       }
 
+      function submitTyped() {
+        const el = $('#typed');
+        const v = (el.value||'').trim();
+        if (!v) return;
+        el.value = '';
+        handleInput(v, false);
+        el.focus();
+      }
+
+      let lastTypeTs = 0;
+      let autoChunkTimer = null;
+
+      function setupAutoChunk() {
+        if (autoChunkTimer) { clearInterval(autoChunkTimer); autoChunkTimer = null; }
+        const sec = parseInt($('#autochunk').value||'0',10);
+        if (!sec) return;
+        autoChunkTimer = setInterval(() => {
+          const idle = (Date.now() - lastTypeTs) / 1000;
+          if (idle >= sec) submitTyped();
+        }, 500);
+      }
+
       // UI bindings
       window.addEventListener('load', () => {
         supportCheck(); populateVoices();
@@ -280,10 +363,23 @@
         $('#saveBtn').addEventListener('click', () => downloadText(`session-${Date.now()}.txt`, $('#log').value));
         $('#clearBtn').addEventListener('click', () => { state.lines=[]; $('#log').value=''; });
         $('#typed').addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') { e.preventDefault(); const v=e.target.value.trim(); e.target.value=''; handleInput(v,false); }
+          if ((e.key === 'Enter') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submitTyped(); return; }
+          if (e.key === 'Enter') {
+            const el = e.target; const val = el.value;
+            const last2 = val.endsWith('\n\n');
+            if (last2) { e.preventDefault(); submitTyped(); return; }
+          }
           if (e.key === ' ') { if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; e.preventDefault(); state.recoActive ? stopReco() : startReco(); }
           if (e.key === 'Escape') { stopSession(); }
         });
+        $('#typed').addEventListener('input', () => { lastTypeTs = Date.now(); });
+        $('#autochunk').addEventListener('change', setupAutoChunk);
+        $('#bigInput').addEventListener('change', (e) => {
+          $('#typed').style.height = e.target.checked ? '60vh' : '220px';
+          $('#typed').focus();
+        });
+        setupAutoChunk();
+        $('#typed').focus();
       });
     </script>
   </body>
