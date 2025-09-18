@@ -16,6 +16,7 @@ A starter Python project scaffolded for CLI + simple HTML examples, following th
 - src/lib/eyesfree.py: Slash-command parser for eyes-free mode
  - src/lib/stt.py: Optional microphone STT (SpeechRecognition)
 - examples/: Single-file HTML apps
+  - examples/partner_voice_site.html — Voice-guided site (TTS + STT)
 - picture_diary/: Fixed local URLs (v1 and v2)
 - scripts/: Helper scripts
 - tests/: Pytest suites mirroring src/
@@ -45,3 +46,7 @@ A starter Python project scaffolded for CLI + simple HTML examples, following th
   - Interval prompts every `--interval-sec` (default 60)
   - Respond by speaking or typing; supports `/pause`, `/resume`, `/skip`, `/read`, `/undo`, `/save <path>`, `/done`
   - Transcript is timestamped; add `--save session.txt` to persist
+
+## Web Examples
+- Serve locally: `make web` then open http://localhost:8000/examples/partner_voice_site.html
+- Open directly (macOS/Linux): `make open-partner`

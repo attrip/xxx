@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Partner Voice Session</title>
+    <style>
+      :root { --bg:#0b0c10; --fg:#e5e7eb; --muted:#94a3b8; --accent:#22d3ee; --card:#111827; }
+      body { margin:0; background:var(--bg); color:var(--fg); font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+      header { padding:16px 20px; border-bottom:1px solid #1f2937; display:flex; align-items:center; gap:12px; }
+      header h1 { font-size:18px; margin:0; letter-spacing:.2px; }
+      main { padding:16px 20px; display:grid; gap:16px; grid-template-columns: 1fr; }
+      .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+      .card { background:var(--card); border:1px solid #1f2937; border-radius:10px; padding:12px; }
+      .controls button { background:#0ea5e9; color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; }
+      .controls button.secondary { background:#374151; }
+      .controls button.danger { background:#ef4444; }
+      .controls button:disabled { opacity:.5; cursor:not-allowed; }
+      label { color:var(--muted); font-size:12px; display:block; margin-bottom:4px; }
+      input, select { background:#0b1220; color:var(--fg); border:1px solid #1f2937; border-radius:8px; padding:8px; }
+      textarea { width:100%; min-height:180px; background:#0b1220; color:var(--fg); border:1px solid #1f2937; border-radius:8px; padding:10px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .pill { font-size:12px; color:#0ea5e9; background:#062c3b; border:1px solid #0ea5e9; padding:3px 8px; border-radius:999px; }
+      .hint { color:var(--muted); font-size:12px; }
+      footer { padding:12px 20px; color:#94a3b8; font-size:12px; border-top:1px solid #1f2937; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Partner Voice Session</h1>
+      <span class="pill" id="supportStatus">Checking speech support…</span>
+    </header>
+    <main>
+      <section class="card">
+        <div class="row">
+          <div>
+            <label>Voice</label>
+            <select id="voice"></select>
+          </div>
+          <div>
+            <label>Rate</label>
+            <input id="rate" type="number" min="0.5" max="2" step="0.1" value="1.0" />
+          </div>
+          <div>
+            <label>Interval (sec)</label>
+            <input id="interval" type="number" min="10" step="5" value="60" />
+          </div>
+          <div>
+            <label>Minutes</label>
+            <input id="minutes" type="number" min="1" step="1" value="15" />
+          </div>
+          <div>
+            <label>Readback</label>
+            <select id="readback">
+              <option value="confirm">Confirm only</option>
+              <option value="full">Read full input</option>
+              <option value="off">Silent</option>
+            </select>
+          </div>
+        </div>
+        <div class="row controls" style="margin-top:10px;">
+          <button id="startSession">Start Session</button>
+          <button id="stopSession" class="secondary" disabled>Stop Session</button>
+          <button id="micToggle" class="secondary">Start Mic</button>
+          <button id="readTranscript" class="secondary">Read Transcript</button>
+          <button id="saveBtn" class="secondary">Save</button>
+          <button id="clearBtn" class="danger">Clear</button>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <span class="hint">Commands: /pause /resume /skip /read /undo /save /done（日本語もOK: 終了, ポーズ, 再開, 読み上げ, 取り消し, 保存）</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <label for="typed">Type here (Enter to add)</label>
+        <input id="typed" class="mono" placeholder="あなたの言葉を入力…" />
+        <div class="hint" style="margin-top:6px;">Space: toggle mic, Enter: add text, Esc: stop session</div>
+      </section>
+
+      <section class="card">
+        <label>Transcript</label>
+        <textarea id="log" readonly></textarea>
+      </section>
+    </main>
+    <footer>
+      Built on Web Speech API (voice) + webkitSpeechRecognition (voice input; Chrome). If STT is unsupported, you can still type.
+    </footer>
+
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const state = {
+        speaking: false,
+        reco: null,
+        recoActive: false,
+        sessionTimer: null,
+        sessionEndsAt: 0,
+        nextTick: 0,
+        lines: [],
+        audioCtx: null,
+      };
+
+      // Short chime via WebAudio
+      function chime() {
+        try {
+          if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const o = state.audioCtx.createOscillator();
+          const g = state.audioCtx.createGain();
+          o.type = 'sine';
+          o.frequency.value = 880;
+          g.gain.setValueAtTime(0.0001, state.audioCtx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.2, state.audioCtx.currentTime + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.0001, state.audioCtx.currentTime + 0.2);
+          o.connect(g).connect(state.audioCtx.destination);
+          o.start();
+          o.stop(state.audioCtx.currentTime + 0.21);
+        } catch {}
+      }
+
+      // TTS
+      function speak(text) {
+        if (!('speechSynthesis' in window)) return;
+        const u = new SpeechSynthesisUtterance(text);
+        const voiceSel = $('#voice').value;
+        const rate = parseFloat($('#rate').value || '1.0');
+        u.rate = Math.max(0.5, Math.min(2, rate));
+        const vs = speechSynthesis.getVoices();
+        const v = vs.find(v => v.name === voiceSel);
+        if (v) u.voice = v;
+        state.speaking = true;
+        u.onend = () => { state.speaking = false; };
+        speechSynthesis.speak(u);
+      }
+
+      function supportCheck() {
+        const tts = 'speechSynthesis' in window;
+        const stt = 'webkitSpeechRecognition' in window;
+        $('#supportStatus').textContent = `${tts ? 'TTS OK' : 'TTS NG'} · ${stt ? 'STT OK' : 'STT NG'}`;
+      }
+
+      function populateVoices() {
+        if (!('speechSynthesis' in window)) return;
+        const sel = $('#voice');
+        sel.innerHTML = '';
+        const voices = speechSynthesis.getVoices();
+        for (const v of voices) {
+          if (!v.lang.startsWith('ja') && !v.lang.startsWith('en')) continue;
+          const opt = document.createElement('option');
+          opt.value = v.name; opt.textContent = `${v.name} (${v.lang})`;
+          sel.appendChild(opt);
+        }
+        // Try to pick a Japanese voice if available
+        const ja = voices.find(v => v.lang.startsWith('ja'));
+        if (ja) sel.value = ja.name;
+      }
+
+      // STT
+      function startReco() {
+        if (!('webkitSpeechRecognition' in window)) { alert('STT unsupported in this browser.'); return; }
+        if (state.recoActive) return;
+        const R = new webkitSpeechRecognition();
+        R.lang = ($('#voice').value.includes('(') ? ($('#voice').value.match(/\((.*?)\)/)?.[1]||'ja-JP') : 'ja-JP');
+        R.interimResults = false; R.continuous = false;
+        R.onresult = (e) => {
+          const text = e.results[0][0].transcript.trim();
+          handleInput(text, /*viaVoice=*/true);
+        };
+        R.onend = () => { state.recoActive = false; $('#micToggle').textContent = 'Start Mic'; };
+        R.onerror = () => { state.recoActive = false; $('#micToggle').textContent = 'Start Mic'; };
+        state.reco = R; state.recoActive = true; R.start();
+        $('#micToggle').textContent = 'Stop Mic';
+      }
+      function stopReco() { if (state.reco && state.recoActive) { try { state.reco.stop(); } catch {} } }
+
+      function downloadText(filename, text) {
+        const blob = new Blob([text], {type: 'text/plain'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function nowIso() { return new Date().toISOString().slice(0,19).replace('T',' '); }
+      function appendLine(text) {
+        const stamped = `[${nowIso()}] ${text}`;
+        state.lines.push(stamped);
+        const log = $('#log');
+        log.value += (log.value ? '\n' : '') + stamped;
+        log.scrollTop = log.scrollHeight;
+      }
+
+      // Natural language command mapping (ja/en)
+      function normalizeCommand(text) {
+        const t = text.trim().toLowerCase();
+        const map = [
+          ['done', ['done','/done','end','finish','終了','終わり','ストップ','やめる']],
+          ['pause', ['pause','/pause','一時停止','ポーズ','停止']],
+          ['resume', ['resume','/resume','再開','続ける','リジューム']],
+          ['read', ['read','/read','読み上げ','リード','読んで']],
+          ['undo', ['undo','/undo','取り消し','取り消す','アンドゥ']],
+          ['save', ['save','/save','保存','セーブ']],
+          ['skip', ['skip','/skip','スキップ']]
+        ];
+        for (const [name, keys] of map) {
+          if (keys.some(k => t.startsWith(k))) return {name, arg: t.split(/\s+/).slice(1).join(' ')};
+        }
+        if (t.startsWith('/')) return {name:'unknown'};
+        return null;
+      }
+
+      function handleCommand(cmd) {
+        switch (cmd.name) {
+          case 'pause': stopSessionTimer(); speak('一時停止します。'); return true;
+          case 'resume': startSessionTimer(); speak('再開します。'); return true;
+          case 'skip': nextPromptSoon(); chime(); return true;
+          case 'read': speak($('#log').value || 'まだ何もありません。'); return true;
+          case 'undo': {
+            if (state.lines.length) { state.lines.pop(); const v=$('#log').value.split(/\n/); v.pop(); $('#log').value=v.join('\n'); speak('取り消しました。'); }
+            else { speak('取り消すものはありません。'); }
+            return true;
+          }
+          case 'save': {
+            const name = cmd.arg || `session-${Date.now()}.txt`;
+            downloadText(name, $('#log').value);
+            speak('保存しました。');
+            return true;
+          }
+          case 'done': stopSession(); speak('終了します。お疲れさまでした。'); return true;
+          default: speak('使えるコマンドは、ポーズ、再開、スキップ、読み上げ、取り消し、保存、終了です。'); return true;
+        }
+      }
+
+      function handleInput(text, viaVoice=false) {
+        if (!text) return;
+        const cmd = normalizeCommand(text);
+        if (cmd) { handleCommand(cmd); return; }
+        appendLine(text);
+        const mode = $('#readback').value;
+        if (mode === 'confirm') speak('受け取りました。');
+        else if (mode === 'full') speak(text);
+        // chime after voice input
+        if (viaVoice) chime();
+      }
+
+      function startSessionTimer() {
+        stopSessionTimer();
+        const seconds = parseInt($('#interval').value || '60', 10);
+        const speakPrompt = () => {
+          chime();
+          speak('そのまま、気づいたことをどうぞ。終了する場合は、終了と言ってください。');
+        };
+        // schedule
+        state.sessionTimer = setInterval(speakPrompt, Math.max(10, seconds) * 1000);
+      }
+
+      function stopSessionTimer() { if (state.sessionTimer) { clearInterval(state.sessionTimer); state.sessionTimer = null; } }
+      function nextPromptSoon() { stopSessionTimer(); state.sessionTimer = setInterval(() => { chime(); speak('続けましょう。'); stopSessionTimer(); startSessionTimer(); }, 1500); }
+
+      function startSession() {
+        const mins = parseInt($('#minutes').value || '15', 10);
+        state.sessionEndsAt = Date.now() + Math.max(1, mins) * 60 * 1000;
+        $('#startSession').disabled = true; $('#stopSession').disabled = false;
+        chime(); speak('セッションを開始します。'); startSessionTimer();
+        // end watch
+        const endWatch = setInterval(() => {
+          if (Date.now() >= state.sessionEndsAt) { clearInterval(endWatch); stopSession(); speak('セッションを終了します。'); }
+        }, 1000);
+      }
+      function stopSession() {
+        stopSessionTimer(); $('#startSession').disabled = false; $('#stopSession').disabled = true;
+      }
+
+      // UI bindings
+      window.addEventListener('load', () => {
+        supportCheck(); populateVoices();
+        if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = populateVoices;
+        $('#startSession').addEventListener('click', startSession);
+        $('#stopSession').addEventListener('click', stopSession);
+        $('#micToggle').addEventListener('click', () => state.recoActive ? stopReco() : startReco());
+        $('#readTranscript').addEventListener('click', () => speak($('#log').value || 'まだ何もありません。'));
+        $('#saveBtn').addEventListener('click', () => downloadText(`session-${Date.now()}.txt`, $('#log').value));
+        $('#clearBtn').addEventListener('click', () => { state.lines=[]; $('#log').value=''; });
+        $('#typed').addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); const v=e.target.value.trim(); e.target.value=''; handleInput(v,false); }
+          if (e.key === ' ') { if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return; e.preventDefault(); state.recoActive ? stopReco() : startReco(); }
+          if (e.key === 'Escape') { stopSession(); }
+        });
+      });
+    </script>
+  </body>
+  </html>

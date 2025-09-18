@@ -44,3 +44,6 @@ open-v2:
 
 open-dmi:
 	@([ "$(shell uname)" = "Darwin" ] && open examples/diary_music_image.html) || (which xdg-open >/dev/null 2>&1 && xdg-open examples/diary_music_image.html) || echo "Open: examples/diary_music_image.html"
+
+open-partner:
+	@([ "$(shell uname)" = "Darwin" ] && open examples/partner_voice_site.html) || (which xdg-open >/dev/null 2>&1 && xdg-open examples/partner_voice_site.html) || echo "Open: examples/partner_voice_site.html"
