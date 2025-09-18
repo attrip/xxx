@@ -11,16 +11,74 @@
   </head>
   <body>
     <h1>Workbench</h1>
-    <p class="muted">このページは作業用のスターターです。自由に編集してください。</p>
-    <ul>
-      <li>Dev Agent: <code>make web-dev-agent</code> → <a href="http://localhost:8000/examples/dev_agent.html">http://localhost:8000/examples/dev_agent.html</a></li>
-      <li>パス: <code>file:///Users/flex-pc0705/xxx/workbench/index.html</code> を Dev Agent に貼って Stage/Commit/Push</li>
-    </ul>
-    <hr />
-    <div id="app"></div>
+    <p class="muted">このページは作業用スターターです。下の2つだけ指定して、Enterで「ステージ→コミット→プッシュ」まで一発でやります。</p>
+
+    <div style="border:1px solid #e5e7eb; border-radius:10px; padding:12px; margin:16px 0;">
+      <div style="margin-bottom:8px;">
+        <label>いま見ている作業ファイル（自動で入ります）</label><br>
+        <input id="workUrl" type="text" style="width:680px; padding:8px;" />
+      </div>
+      <div style="margin-bottom:8px;">
+        <label>Gitのレポジトリ（ルートフォルダのパス）</label><br>
+        <input id="repoPath" type="text" style="width:680px; padding:8px;" />
+      </div>
+      <div style="margin-bottom:8px;">
+        <label>コミットメッセージ</label><br>
+        <input id="commitMsg" type="text" style="width:680px; padding:8px;" placeholder="chore: update workbench" />
+      </div>
+      <div>
+        <button id="go" style="padding:10px 14px;">Commit + Push（Enter）</button>
+        <span id="out" class="muted" style="margin-left:8px;"></span>
+      </div>
+      <div style="margin-top:8px;" class="muted">補足: この操作はローカルAPI（http://localhost:8000）を使います。未起動なら別タブで <code>make web</code> を実行してください。</div>
+    </div>
+
     <script>
-      // 好きなJSをここから書き始めてください
-      document.getElementById('app').textContent = 'Ready to hack.';
+      const $ = (s) => document.querySelector(s);
+      async function post(path, body) {
+        const r = await fetch(`http://localhost:8000${path}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) });
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        return await r.json();
+      }
+      function guessRepoFromFileUrl(u) {
+        try {
+          const url = new URL(u);
+          if (url.protocol !== 'file:') return '';
+          const p = decodeURIComponent(url.pathname);
+          // 例: /Users/you/xxx/workbench/index.html → /Users/you/xxx
+          const i = p.indexOf('/workbench/');
+          if (i > 0) return p.slice(0, i);
+          // fallback: 2階層上
+          const parts = p.split('/').filter(Boolean);
+          return '/' + parts.slice(0, Math.max(0, parts.length-2)).join('/');
+        } catch { return ''; }
+      }
+      async function runOnce() {
+        const work = $('#workUrl').value.trim();
+        const repo = $('#repoPath').value.trim();
+        const msg  = $('#commitMsg').value.trim() || 'chore: update workbench';
+        if (!work || !repo) { $('#out').textContent = 'パスを確認してください'; return; }
+        $('#out').textContent = 'staging...';
+        await post('/api/git/add', { repo, paths: [work] });
+        $('#out').textContent = 'committing...';
+        await post('/api/git/commit', { repo, message: msg });
+        $('#out').textContent = 'pushing...';
+        const res = await post('/api/git/push', { repo, remote: 'origin', branch: 'main' });
+        $('#out').textContent = 'done';
+      }
+      window.addEventListener('load', () => {
+        const here = window.location.href;
+        $('#workUrl').value = here;
+        const g = guessRepoFromFileUrl(here);
+        if (g) $('#repoPath').value = g;
+        $('#commitMsg').value = 'chore: update workbench';
+        $('#go').addEventListener('click', runOnce);
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault(); runOnce();
+          }
+        });
+      });
     </script>
   </body>
   </html>

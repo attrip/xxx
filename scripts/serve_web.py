@@ -26,6 +26,10 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
         data = json.dumps(obj).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        # CORS for file:// and other origins
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -133,6 +137,14 @@ class DevHandler(http.server.SimpleHTTPRequestHandler):
                 return self._send_json({"ok": False, "error": str(e)}, code=500)
 
         return self._send_json({"error": "unknown route"}, code=404)
+
+    def do_OPTIONS(self):  # noqa: N802
+        # Preflight CORS support
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+        self.end_headers()
 
 
 def _run_capture(cmd):

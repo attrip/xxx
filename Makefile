@@ -54,3 +54,6 @@ open-dev-agent:
 
 web-dev-agent:
 	OPEN_PATH=/examples/dev_agent.html $(PYTHON) scripts/serve_web.py
+
+web-workbench:
+	OPEN_PATH=/workbench/index.html $(PYTHON) scripts/serve_web.py
