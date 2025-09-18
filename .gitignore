@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Mac
+.DS_Store
+
+# Build/export
+dist/
+build/
+
+# Env
+.env.local

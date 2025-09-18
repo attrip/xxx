@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Diary/Music/Image Builder</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
+      textarea, input, select { width: 100%; }
+      textarea { height: 24vh; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+      .out { white-space: pre-wrap; background: #fafafa; padding: 1rem; border: 1px solid #eee; }
+    </style>
+  </head>
+  <body>
+    <h1>Diary / Music / Image</h1>
+    <div class="grid">
+      <div>
+        <label>Mode</label>
+        <select id="mode">
+          <option>diary</option>
+          <option>music</option>
+          <option>image</option>
+        </select>
+      </div>
+      <div>
+        <label>Seed</label>
+        <input id="seed" placeholder="quick seed text"/>
+      </div>
+      <div>
+        <label>Title (diary)</label>
+        <input id="title" placeholder="Untitled" />
+      </div>
+      <div>
+        <label>Genre (music)</label>
+        <input id="genre" placeholder="ambient" />
+      </div>
+      <div>
+        <label>BPM (music)</label>
+        <input id="bpm" type="number" placeholder="120" />
+      </div>
+      <div>
+        <label>Subject (image)</label>
+        <input id="subject" placeholder="a scene" />
+      </div>
+      <div>
+        <label>Style (image)</label>
+        <input id="style" placeholder="photorealistic" />
+      </div>
+    </div>
+
+    <label>Output</label>
+    <pre id="out" class="out"></pre>
+    <label>Body (diary)</label>
+    <textarea id="body"></textarea>
+
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const update = () => {
+        const mode = $('#mode').value;
+        const seed = $('#seed').value.trim();
+        const title = $('#title').value.trim() || 'Untitled';
+        const genre = $('#genre').value.trim() || 'ambient';
+        const bpm = $('#bpm').value.trim();
+        const subject = $('#subject').value.trim() || 'a scene';
+        const style = $('#style').value.trim() || 'photorealistic';
+        const body = $('#body').value.trim();
+        let out = seed;
+        if (mode === 'diary') {
+          out = `[Diary]\nTitle: ${title}\n${body || seed}`.trim();
+        } else if (mode === 'music') {
+          const bpmPart = bpm ? ` @ ${bpm} BPM` : '';
+          out = `Music: ${genre}${bpmPart}\nMood: ${seed || 'calm'}`;
+        } else if (mode === 'image') {
+          out = `Image: ${subject || seed || 'a scene'}\nStyle: ${style}`;
+        }
+        $('#out').textContent = out;
+      };
+      ['#mode', '#seed', '#title', '#genre', '#bpm', '#subject', '#style', '#body']
+        .forEach(s => $(s).addEventListener('input', update));
+      update();
+    </script>
+  </body>
+  </html>

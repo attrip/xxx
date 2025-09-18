@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Psytrance Prompt Editor</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; }
+      textarea { width: 100%; height: 40vh; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .row { display: flex; gap: 1rem; margin-top: 1rem; }
+      .row > * { flex: 1; }
+      label { display: block; margin-top: 0.5rem; font-size: 0.9rem; color: #555; }
+      .out { white-space: pre-wrap; background: #fafafa; padding: 1rem; border: 1px solid #eee; }
+    </style>
+  </head>
+  <body>
+    <h1>Psytrance Prompt Editor</h1>
+    <p>Local-only editor that formats a simple music prompt.</p>
+    <div class="row">
+      <div>
+        <label>Genre</label>
+        <input id="genre" value="psytrance" />
+      </div>
+      <div>
+        <label>BPM</label>
+        <input id="bpm" type="number" value="145" />
+      </div>
+      <div>
+        <label>Mood</label>
+        <input id="mood" value="driving, hypnotic, psychedelic" />
+      </div>
+    </div>
+    <label>Output</label>
+    <pre id="out" class="out"></pre>
+    <script>
+      const $ = (s) => document.querySelector(s);
+      const update = () => {
+        const bpm = $('#bpm').value.trim();
+        const genre = $('#genre').value.trim() || 'psytrance';
+        const mood = $('#mood').value.trim() || 'hypnotic';
+        const bpmPart = bpm ? ` @ ${bpm} BPM` : '';
+        $('#out').textContent = `Music: ${genre}${bpmPart}\nMood: ${mood}`;
+      };
+      ['#bpm', '#genre', '#mood'].forEach(s => $(s).addEventListener('input', update));
+      update();
+    </script>
+  </body>
+  </html>
