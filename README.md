@@ -17,7 +17,6 @@ A starter Python project scaffolded for CLI + simple HTML examples, following th
  - src/lib/stt.py: Optional microphone STT (SpeechRecognition)
 - examples/: Single-file HTML apps
   - examples/partner_voice_site.html — Voice-guided site (TTS + STT)
-  - examples/dev_agent.html — Paste local paths/URLs to stage/commit/push
 - picture_diary/: Fixed local URLs (v1 and v2)
 - scripts/: Helper scripts
 - tests/: Pytest suites mirroring src/
@@ -51,4 +50,5 @@ A starter Python project scaffolded for CLI + simple HTML examples, following th
 ## Web Examples
 - Serve locally: `make web` then open http://localhost:8000/examples/partner_voice_site.html
 - Open directly (macOS/Linux): `make open-partner`
- - Dev Agent: `make open-dev-agent` (or open http://localhost:8000/examples/dev_agent.html)
+  
+Security note: Browser-based git commit/push UIs were removed. Use CLI or GitHub UI/Desktop.
